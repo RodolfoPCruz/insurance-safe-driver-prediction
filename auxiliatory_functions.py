@@ -56,9 +56,9 @@ def chi_squared_test_cramers_features_output(data,alpha):
         results['cramers_df']=results['cramers_df']+[cramers_dof]
 
         if p<alpha/2:
-            conclusion='Dependent'
+            conclusion='Dependente'
         else:
-            conclusion='Independent'
+            conclusion='Independente'
         results['conclusion']=results['conclusion']+[conclusion]
     results=pd.DataFrame(results,index=features)
     results.sort_values(by=['cramers_v'],ascending=False,inplace=True)
@@ -112,8 +112,8 @@ def heat_map_significance(confusion_matrix,alpha,size=[12,8]):
     #significance level to determine whether the features are independent.
     #alpha is the required significance
     cmap = sns.mpl_palette("Set1", 2)
-    legend_handles = [Patch(color=cmap[True], label='Not independent'),  # red
-                  Patch(color=cmap[False], label='Independent')]  # green
+    legend_handles = [Patch(color=cmap[True], label='Dependente'),  # red
+                  Patch(color=cmap[False], label='Independente')]  # green
     plt.legend(handles=legend_handles, ncol=2, bbox_to_anchor=[0.5, 1.02], loc='lower center', 
            fontsize=8, handlelength=.8)
     sns.heatmap(confusion_matrix<alpha/2,cmap=cmap,cbar=False)
@@ -129,53 +129,53 @@ def cramers_level(df,cr):
     '''
     if df==1:
         if cr<=0.1:
-            i='negligible'
+            i='negligenciavel'
         elif 0.1<cr<=0.3:
-            i='small'
+            i='pequeno'
         elif 0.3<cr<=0.5:
-            i='medium'
+            i='medio'
         else:
-            i='large'
+            i='grande'
 
     if df==2:
         if cr<=0.07:
-            i='negligible'
+            i='negligenciavel'
         elif 0.07<cr<=0.21:
-            i='small'
+            i='pequeno'
         elif 0.21<cr<=0.35:
-            i='medium'
+            i='medio'
         else:
-            i='large'
+            i='grande'
 
     if df==3:
         if cr<=0.06:
-            i='negligible'
+            i='negligenciavel'
         elif 0.06<cr<=0.17:
-            i='small'
+            i='pequeno'
         elif 0.17<cr<=0.29:
-            i='medium'
+            i='medio'
         else:
-            i='large'
+            i='grande'
 
     if df==4:
         if cr<=0.05:
-            i='negligible'
+            i='negligenciavel'
         elif 0.05<cr<=0.15:
-            i='small'
+            i='pequeno'
         elif 0.15<cr<=0.25:
-            i='medium'
+            i='medio'
         else:
-            i='large'
+            i='grande'
 
     if df>=5:
         if cr<=0.05:
-            i='negligible'
+            i='negligenciavel'
         elif 0.05<cr<=0.13:
-            i='small'
+            i='pequeno'
         elif 0.13<cr<=0.22:
-            i='medium'
+            i='medio'
         else:
-            i='large'
+            i='grande'
 
     return i
 
@@ -202,12 +202,12 @@ def association_to_number(x):
     #Function to convert the dataframe containg the cramer's levels of association to numbers. 
     #The conversion  is necessary to create a heatmap 
 
-    if x=='large':
+    if x=='grande':
         return 255
-    if x=='medium':
+    if x=='medio':
         return 128
-    if x== 'small':
+    if x== 'pequeno':
         return 64 
-    if x== 'negligible':
+    if x== 'negligenciavel':
         return 0
 
