@@ -3,8 +3,24 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.patches import Patch
 import matplotlib.pyplot as plt
+import tensorflow as tf
 
+from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import cross_validate
+from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import f1_score
+from sklearn.metrics import classification_report
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
 
+from time import sleep
+from tqdm import tqdm,trange
 from scipy.stats import chi2_contingency
 
 def chi_squared_test_cramers_features_output(data,alpha):
@@ -211,3 +227,125 @@ def association_to_number(x):
     if x== 'negligenciavel':
         return 0
 
+def train_baseline(x,y,models_dict,sampler=None,n_splits=5):
+    '''
+    x           - input data
+    y           - output data
+    models_dict - dicionário com os modelos que serão treinados.    
+    sampler     - instância de um objeto que fará o balanceamentos do dataset
+    n_splits    - numero de splits que será usada na validação cruzada.
+    '''
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=1)
+    results={'model':[],'scores':[]}
+    
+    
+    for key in tqdm(models_dict,desc='Models'):
+        scores={'accuracy':[],'precision':[],'recall':[],'roc_auc':[]}
+        for train_index, test_index in skf.split(x, y):
+            
+            
+            
+            x_train,x_test=x.iloc[train_index],x.iloc[test_index]
+            y_train,y_test=y.iloc[train_index],y.iloc[test_index]
+            
+            if sampler:
+            #model=make_pipeline(sampler,
+            #           models_dict[str(key)][0])
+                x_train,y_train=sampler.fit_resample(x_train,y_train)
+                models_dict[str(key)][0].fit(x_train,y_train)
+            else :
+                models_dict[str(key)][0].fit(x_train,y_train)
+            y_pred_proba=models_dict[str(key)][0].predict_proba(x_test)
+            y_pred=np.argmax(y_pred_proba,axis=1)
+            scores['accuracy']=scores['accuracy']  +[accuracy_score(y_test,y_pred)]
+            scores['precision']=scores['precision']+[precision_score(y_test,y_pred)]
+            scores['recall']=scores['recall']      +[recall_score(y_test,y_pred)]
+            scores['roc_auc']=scores['roc_auc']    +[roc_auc_score(y_test,y_pred_proba[:,1])]
+        results['model'] =results['model']+[str(key)]
+        results['scores']=results['scores']+[scores]
+    return results
+
+
+def update_dictionary(dict_complete,dataset,dict_brief=None,model_name="LGBM"):
+    '''
+    The models were trained using cross-validation, which means that the scores were calculated for each split. 
+    The purpose of this function is to calculate the mean of the scores. 
+
+    If more than one model was trained, it is necessary to specify the model's name. 
+    The dictionary contains a key with all the trained models in this case.
+    
+    dict_complete - a dictionary containing all the scores of the cross validation procedure
+    dataset       - description of the dataset used to train the models
+    model name    - the name of the model. The function return the results for only one model.
+    dict_brief    - a dictionary containing the mean of the scores. If a dict is passed to the function, it will
+    be updated. If not, a new one is created.
+    
+    The function returns a dictionary containing the mean of the scores for the metrics precision, 
+    recall and roc auc
+    '''
+    if dict_brief is None:
+        dict_brief={'dataset':[],'mean_precision':[],'mean_recall':[],'mean_roc':[]}
+
+    dict_brief['dataset']       = dict_brief['dataset']+[dataset]
+
+    if 'model' in dict_complete.keys():
+        n=dict_complete['model'].index(model_name)
+        dict_brief['mean_precision']= dict_brief['mean_precision']+[np.mean(dict_complete['scores'][n]['precision'])]
+        dict_brief['mean_recall']   = dict_brief['mean_recall']+[np.mean(dict_complete['scores'][n]['recall'])]
+        dict_brief['mean_roc']      = dict_brief['mean_roc']+[np.mean(dict_complete['scores'][n]['roc_auc'])]
+    
+    else:
+        dict_brief['mean_precision']= dict_brief['mean_precision']+[np.mean(dict_complete['test_precision'])]
+        dict_brief['mean_recall']   = dict_brief['mean_recall']+[np.mean(dict_complete['test_recall'])]
+        dict_brief['mean_roc']      = dict_brief['mean_roc']+[np.mean(dict_complete['test_roc_auc'])]
+    return dict_brief
+
+
+def train_model(model,x,y,scoring,sampler=None):
+    '''
+    model       -model that will be trained (instance of an object)
+    scoring     - metrics that will be measured
+    sampler     - instance of an object that will balance the dataset   
+    '''
+    if sampler:
+        model_pipeline=make_pipeline(sampler,
+                           model)
+        scores=cross_validate(model_pipeline,x,y,scoring=scoring)
+    else :
+        scores=cross_validate(model,x,y,scoring=scoring)
+    return scores
+
+def generating_new_samples(x,y,codings_size,auto_encoder,decoder):
+        '''
+        Função será usada para gerar novas amostras da classe minoritária
+	codings_size - shape of the sample that the encoder outpus
+        model        - the decoder that will generate the new samples
+        '''
+        n_samples_per_class=pd.Series.value_counts(y) #get the number of samples from each class
+        target_value_minority_class=n_samples_per_class.idxmin() #get target value of the minority class
+        n_min,n_max=n_samples_per_class.min(),n_samples_per_class.max() #number of samples from each class
+        n_samples=n_max-n_min #number of samples that will be generated
+        
+        #Separating the samples from both classes
+        indexes_class_1=np.where(y==1)[0]
+        indexes_class_0=np.where(y==0)[0]
+
+        x_class_1=x.iloc[indexes_class_1]
+        x_class_0=x.iloc[indexes_class_0]
+        y_class_1=y.iloc[indexes_class_1]
+        y_class_0=y.iloc[indexes_class_0]
+        
+        x_class_1_train,x_class_1_test=train_test_split(x_class_1, test_size=0.33, random_state=42)
+        #Training the autoencoder
+        history=auto_encoder.fit(x_class_1_train,x_class_1_train,epochs=200,batch_size=128,
+                                   validation_data=[x_class_1_test,x_class_1_test])
+        condings_new_samples=tf.random.normal(shape=[n_samples,codings_size])
+        #Creating new samples
+        new_samples=pd.DataFrame(decoder(condings_new_samples).numpy(),columns=x.columns)
+        y_new=pd.Series(n_samples*[target_value_minority_class])
+        x=pd.concat([x,new_samples],ignore_index=True,axis=0)
+        y=pd.concat([y,y_new],axis=0)
+        x,y=shuffle(x, y, random_state=0)
+        x.reset_index(inplace=True,drop=True)
+        y.reset_index(inplace=True,drop=True)
+        return x,y
