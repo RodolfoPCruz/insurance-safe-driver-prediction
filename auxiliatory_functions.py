@@ -222,9 +222,9 @@ def association_to_number(x):
         return 255
     if x=='medio':
         return 128
-    if x== 'pequeno':
+    if x=='pequeno':
         return 64 
-    if x== 'negligenciavel':
+    if x=='negligenciavel':
         return 0
 
 def train_baseline(x,y,models_dict,sampler=None,n_splits=5):
